@@ -41,7 +41,7 @@ namespace YoutubeDownloader
             var streamInfo = streamInfoSet.Muxed.WithHighestVideoQuality();
             var ext = streamInfo.Container.GetFileExtension();
             await client.DownloadMediaStreamAsync(streamInfo, $"downloaded_video.{ext}");
-            textBox1.Text = "Bitti";
+            textBox1.Text = "Bitti.";
         }
     }
 }
