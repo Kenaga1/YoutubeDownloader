@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using YoutubeExplode;
+using YoutubeExplode.Models;
 using YoutubeExplode.Models.MediaStreams;
 
 namespace YoutubeDownloader
@@ -15,6 +16,8 @@ namespace YoutubeDownloader
     public partial class Form1 : Form
     {
         MediaStreamInfoSet streamInfoSet;
+
+        bool downloading = false;
         public Form1()
         {
             InitializeComponent();
@@ -27,6 +30,20 @@ namespace YoutubeDownloader
 
         private async void button1_Click(object sender, EventArgs e)
         {
+
+            if (comboBox1.SelectedIndex < 0 || streamInfoSet == null)
+            {
+                MessageBox.Show("Lütfen önce indirmek istediğiniz kaliteyi seçin.");
+                return;
+            }
+            var streamInfo = streamInfoSet.Muxed[comboBox1.SelectedIndex];
+
+            var ext = streamInfo.Container.GetFileExtension();
+            saveFileDialog1.Filter = "Video dosyası|*." + ext;
+            saveFileDialog1.DefaultExt = ext;
+
+            if (saveFileDialog1.ShowDialog() != DialogResult.OK) return;
+
             button1.Enabled = false;
             button2.Enabled = false;
             comboBox1.Enabled = false;
@@ -44,10 +61,14 @@ namespace YoutubeDownloader
 
             //var streamInfo = streamInfoSet.Muxed.WithHighestVideoQuality();
 
-            var streamInfo = streamInfoSet.Muxed[comboBox1.SelectedIndex];
 
-            var ext = streamInfo.Container.GetFileExtension();
-            await client.DownloadMediaStreamAsync(streamInfo, $"downloaded_video.{ext}");
+            var progress = new Progress<double>(p => {
+                progressBar1.Value = (int) (p*100);
+                label2.Text = "% " + progressBar1.Value;
+            });
+            downloading = true;
+            await client.DownloadMediaStreamAsync(streamInfo, saveFileDialog1.FileName, progress);
+            downloading = false;
             MessageBox.Show("Download Completed!");
             button1.Enabled = true;
             button2.Enabled = true;
@@ -57,6 +78,9 @@ namespace YoutubeDownloader
         private async void button2_Click(object sender, EventArgs e)
         {
             button2.Enabled = false;
+            Cursor = Cursors.WaitCursor;
+        
+            button1.Enabled = false;
             var url = textBox1.Text;
             var id = "";
             if (url.Contains("youtube.com") || url.Contains("youtu.be"))
@@ -68,7 +92,21 @@ namespace YoutubeDownloader
             }
 
             var client = new YoutubeClient();
-            var video = await client.GetVideoAsync(id);
+            Video video;
+
+            try
+            {
+                video = await client.GetVideoAsync(id);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Video bulunamadı.");
+                button2.Enabled = true;
+                Cursor = Cursors.Default;
+                return;
+            }
+
+
 
             streamInfoSet = await client.GetVideoMediaStreamInfosAsync(id);
             comboBox1.Items.Clear();
@@ -84,6 +122,22 @@ namespace YoutubeDownloader
                 comboBox1.SelectedIndex = 0;
             }
             button2.Enabled = true;
+            button1.Enabled = true;
+            Cursor = Cursors.Default;
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (downloading)
+            {
+                MessageBox.Show("Lütfen videonun indirilmesini bekleyin.");
+                e.Cancel = true;
+            }
+        }
+
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }
